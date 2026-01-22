@@ -1,0 +1,14 @@
+{
+  "name": "@gesto/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "lint": "echo 'no lint'",
+    "build": "echo 'shared is ts only'"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}

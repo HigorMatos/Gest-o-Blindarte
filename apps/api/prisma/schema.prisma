@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUST
+}
+
+enum InvoiceType {
+  PURCHASE
+  SALES
+}
+
+enum AccountTitleType {
+  PAYABLE
+  RECEIVABLE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  refreshToken String?
+  roles        UserRole[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  roles       RolePermission[]
+}
+
+model UserRole {
+  id     String @id @default(uuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+  role   Role   @relation(fields: [roleId], references: [id])
+  roleId String
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  role         Role       @relation(fields: [roleId], references: [id])
+  roleId       String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  permissionId String
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  entity    String
+  entityId  String
+  action    String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  document  String?
+  email     String?
+  phone     String?
+  vehicles  Vehicle[]
+  contracts Contract[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Vehicle {
+  id        String   @id @default(uuid())
+  plate     String
+  model     String
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Supplier {
+  id        String   @id @default(uuid())
+  name      String
+  document  String?
+  email     String?
+  phone     String?
+  invoices  Invoice[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id        String   @id @default(uuid())
+  name      String
+  sku       String   @unique
+  unit      String
+  lots      InventoryLot[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InventoryLot {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  serial      String?
+  batch       String?
+  quantity    Int
+  location    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  movements   StockMovement[]
+}
+
+model StockMovement {
+  id             String            @id @default(uuid())
+  type           StockMovementType
+  quantity       Int
+  inventoryLotId String?
+  inventoryLot   InventoryLot?     @relation(fields: [inventoryLotId], references: [id])
+  workOrderId    String?
+  workOrder      WorkOrder?        @relation(fields: [workOrderId], references: [id])
+  invoiceId      String?
+  invoice        Invoice?          @relation(fields: [invoiceId], references: [id])
+  createdAt      DateTime          @default(now())
+}
+
+model Contract {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  workOrders WorkOrder[]
+  invoices  Invoice[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WorkOrder {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id])
+  stages      WorkOrderStage[]
+  stockMovements StockMovement[]
+  invoices    Invoice[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WorkOrderStage {
+  id         String   @id @default(uuid())
+  workOrderId String
+  workOrder  WorkOrder @relation(fields: [workOrderId], references: [id])
+  name       String
+  status     String
+  createdAt  DateTime @default(now())
+}
+
+model Invoice {
+  id            String       @id @default(uuid())
+  type          InvoiceType
+  number        String
+  issueDate     DateTime
+  supplierId    String?
+  supplier      Supplier?    @relation(fields: [supplierId], references: [id])
+  contractId    String?
+  contract      Contract?    @relation(fields: [contractId], references: [id])
+  workOrderId   String?
+  workOrder     WorkOrder?   @relation(fields: [workOrderId], references: [id])
+  items         InvoiceItem[]
+  stockMovements StockMovement[]
+  accountsPayableTitle    AccountsPayableTitle?
+  accountsReceivableTitle AccountsReceivableTitle?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model InvoiceItem {
+  id        String   @id @default(uuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Decimal
+  createdAt DateTime @default(now())
+}
+
+model AccountsPayableTitle {
+  id        String   @id @default(uuid())
+  invoiceId String   @unique
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  amount    Decimal
+  dueDate   DateTime
+  status    String
+  payments  Payment[]
+  attachments Attachment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AccountsReceivableTitle {
+  id        String   @id @default(uuid())
+  invoiceId String   @unique
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  amount    Decimal
+  dueDate   DateTime
+  status    String
+  payments  Payment[]
+  attachments Attachment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  amount      Decimal
+  paidAt      DateTime
+  payableTitleId String?
+  receivableTitleId String?
+  payableTitle    AccountsPayableTitle?    @relation(fields: [payableTitleId], references: [id])
+  receivableTitle AccountsReceivableTitle? @relation(fields: [receivableTitleId], references: [id])
+  attachments Attachment[]
+  createdAt  DateTime @default(now())
+}
+
+model Attachment {
+  id          String   @id @default(uuid())
+  filename    String
+  mimeType    String
+  path        String
+  size        Int
+  paymentId   String?
+  payment     Payment? @relation(fields: [paymentId], references: [id])
+  payableTitleId String?
+  receivableTitleId String?
+  payableTitle    AccountsPayableTitle?    @relation(fields: [payableTitleId], references: [id])
+  receivableTitle AccountsReceivableTitle? @relation(fields: [receivableTitleId], references: [id])
+  createdAt  DateTime @default(now())
+}
